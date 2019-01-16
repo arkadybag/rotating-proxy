@@ -1,0 +1,8 @@
+MYSQL:
+  HOST: "us-cdbr-iron-east-01.cleardb.net"
+  PORT: "3306"
+  USER: "b05a23a13b2daf"
+  PASS: "82fb41dc"
+  DB: "heroku_847d88cd568d3f1"
+  CHARSET: "utf8mb4"
+
