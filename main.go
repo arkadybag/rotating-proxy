@@ -8,13 +8,19 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 )
 
 func main() {
-	localAddr := os.Getenv("PORT")
-	ln, err := net.Listen("tcp", localAddr)
+	port := os.Getenv("PORT")
+	ln, err := net.Listen("tcp", ":"+port)
+
+	log.Println("SERVER START ON PORT:", port)
+	log.Println("TIME START:", time.Now())
+
+	log.Println("")
 	if err != nil {
-		log.Println("local address can not connect:", localAddr, err.Error())
+		log.Println("local address can not connect:", port, err.Error())
 	}
 
 	ips := make(chan string, 50)
@@ -23,7 +29,7 @@ func main() {
 	for {
 		c, err := ln.Accept()
 		if err != nil {
-			log.Println("local can not accept connect", err.Error())
+			log.Println("local can not accept connect:", err.Error())
 		}
 		go serveConn(c, <-ips)
 	}
