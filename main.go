@@ -7,10 +7,11 @@ import (
 	"github.com/google/tcpproxy"
 	"log"
 	"net"
+	"os"
 )
 
 func main() {
-	localAddr := ":8080"
+	localAddr := os.Getenv("PORT")
 	ln, err := net.Listen("tcp", localAddr)
 	if err != nil {
 		log.Println("local address can not connect:", localAddr, err.Error())
