@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
-	"github.com/arkadybag/golang-proxy/dao"
 	"github.com/arkadybag/golang-proxy/model"
 	"github.com/google/tcpproxy"
+	"github.com/jinzhu/gorm"
 	"log"
 	"net"
 	"os"
@@ -13,18 +13,28 @@ import (
 
 func main() {
 	port := os.Getenv("PORT")
+
+	if port == "" {
+		port = "8080"
+	}
 	ln, err := net.Listen("tcp", ":"+port)
 
-	log.Println("SERVER START ON PORT:", port)
-	log.Println("TIME START:", time.Now())
-
-	log.Println("")
 	if err != nil {
 		log.Println("local address can not connect:", port, err.Error())
 	}
 
+	log.Println("SERVER START ON PORT:", port)
+	log.Println("TIME START:", time.Now())
+
+	db, err := NewPostgreSQL()
+	defer db.Close()
+
+	if err != nil {
+		log.Fatalln("can not connect to postgres:", err)
+	}
+
 	ips := make(chan string, 50)
-	go getProxyUrl(ips)
+	go getProxyUrl(ips, db)
 
 	for {
 		c, err := ln.Accept()
@@ -51,19 +61,14 @@ func serveConn(c net.Conn, proxyIpPort string) {
 	c.Close()
 }
 
-func getProxyUrl(ips chan string) {
+func getProxyUrl(ips chan string, db *gorm.DB) {
 	for {
-		query := "select * from proxy order by score desc limit 50"
+		proxies := []*model.Proxy{}
 
-		proxy, err := dao.GetSQLResult("proxy", query)
-		if err != nil {
-			getProxyUrl(ips)
-		}
+		db.Order("score desc").Limit(50).Find(&proxies)
 
-		proxyModels := *proxy.(*[]model.Proxy)
-
-		for _, proxyModel := range proxyModels {
-			ips <- proxyModel.Content
+		for _, proxy := range proxies {
+			ips <- proxy.Content
 		}
 	}
 }

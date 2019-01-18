@@ -1,6 +1,0 @@
-POSTGRESQL:
-  HOST: "89.179.126.31"
-  PORT: "5432"
-  USER: "proxy"
-  PASS: "ghbdtn"
-  DB: "proxy"
