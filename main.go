@@ -2,9 +2,9 @@ package main
 
 import (
 	"bufio"
+	"github.com/arkadybag/golang-proxy/dao"
+	"github.com/arkadybag/golang-proxy/model"
 	"github.com/google/tcpproxy"
-	"github.com/storyicon/golang-proxy/dao"
-	"github.com/storyicon/golang-proxy/model"
 	"log"
 	"net"
 )
