@@ -2,12 +2,12 @@ package main
 
 import (
 	"bufio"
-	"github.com/arkadybag/golang-proxy/model"
 	"github.com/google/tcpproxy"
 	"github.com/jinzhu/gorm"
 	"log"
 	"net"
 	"os"
+	"proxy-miner/models"
 	"time"
 )
 
@@ -58,12 +58,12 @@ func serveConn(c net.Conn, proxyIpPort string) {
 	}
 	log.Println("handle for:", c.LocalAddr(), c.RemoteAddr())
 	target.HandleConn(c)
-	c.Close()
+	_ = c.Close()
 }
 
 func getProxyUrl(ips chan string, db *gorm.DB) {
 	for {
-		proxies := []*model.Proxy{}
+		proxies := []*models.Proxy{}
 
 		db.Order("score desc").Limit(50).Find(&proxies)
 
