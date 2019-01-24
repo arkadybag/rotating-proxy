@@ -33,7 +33,7 @@ func main() {
 		log.Fatalln("can not connect to postgres:", err)
 	}
 
-	ips := make(chan string, 50)
+	ips := make(chan string, 100)
 	go getProxyUrl(ips, db)
 
 	for {
@@ -65,7 +65,7 @@ func getProxyUrl(ips chan string, db *gorm.DB) {
 	for {
 		proxies := []*models.Proxy{}
 
-		db.Order("score desc").Limit(50).Find(&proxies)
+		db.Table("proxies").Order("score desc").Limit(100).Find(&proxies)
 
 		for _, proxy := range proxies {
 			ips <- proxy.Content
