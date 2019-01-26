@@ -33,7 +33,7 @@ func main() {
 		log.Fatalln("can not connect to postgres:", err)
 	}
 
-	ips := make(chan string, 100)
+	ips := make(chan string, 1000)
 	go getProxyUrl(ips, db)
 
 	for {
@@ -41,13 +41,13 @@ func main() {
 		if err != nil {
 			log.Println("local can not accept connect:", err.Error())
 		}
-		go serveConn(c, <-ips)
+		go serveConn(c, ips)
 	}
 }
 
-func serveConn(c net.Conn, proxyIpPort string) {
+func serveConn(c net.Conn, ips chan string) {
 	br := bufio.NewReader(c)
-	target := tcpproxy.To(proxyIpPort)
+	target := tcpproxy.To(<-ips)
 
 	if n := br.Buffered(); n > 0 {
 		peeked, _ := br.Peek(br.Buffered())
@@ -65,7 +65,11 @@ func getProxyUrl(ips chan string, db *gorm.DB) {
 	for {
 		proxies := []*models.Proxy{}
 
-		db.Table("proxies").Order("score desc").Limit(100).Find(&proxies)
+		db.Table("proxies").
+			Select("content").
+			Order("score desc").
+			Limit(1000).
+			Find(&proxies)
 
 		for _, proxy := range proxies {
 			ips <- proxy.Content
