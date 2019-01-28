@@ -72,7 +72,7 @@ func tryHandle(c net.Conn, ips chan string) {
 	err := target.HandleConn(c)
 
 	if err != nil {
-		log.Println("try request for:", c.RemoteAddr())
+		log.Println("error for:", target.Addr, "try next...")
 		tryHandle(c, ips)
 	}
 }
