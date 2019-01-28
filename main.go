@@ -64,10 +64,11 @@ func serveConn(c net.Conn, ips chan string) {
 }
 
 func tryHandle(target *tcpproxy.DialProxy, c net.Conn) {
-	log.Println("handle for:", c.LocalAddr(), c.RemoteAddr())
+	log.Println("handle for:", c.RemoteAddr())
 	err := target.HandleConn(c)
 
 	if err != nil {
+		log.Println("try request for:", c.RemoteAddr())
 		tryHandle(target, c)
 	}
 }
