@@ -48,6 +48,7 @@ func main() {
 func serveConn(c net.Conn, ips chan string) {
 	br := bufio.NewReader(c)
 	target := tcpproxy.To(<-ips)
+	target.DialTimeout = time.Second * 5
 
 	if n := br.Buffered(); n > 0 {
 		peeked, _ := br.Peek(br.Buffered())
@@ -77,8 +78,8 @@ func getProxyUrl(ips chan string, db *gorm.DB) {
 
 		db.Table("proxies").
 			Select("content").
-			Where("update_time <= ?", time.Now().Unix()-int64(240)).
-			Order("score desc").
+			Where("update_time >= ? AND avg_response_time <= ?", time.Now().Unix()-int64(240), 4).
+			Order(gorm.Expr("random()")).
 			Limit(100).
 			Find(&proxies)
 
