@@ -2,7 +2,7 @@ package main
 
 import (
 	"bufio"
-	"github.com/google/tcpproxy"
+	"github.com/arkadybag/tcpproxy"
 	"github.com/jinzhu/gorm"
 	"log"
 	"net"
@@ -56,9 +56,19 @@ func serveConn(c net.Conn, ips chan string) {
 			Conn:   c,
 		}
 	}
-	log.Println("handle for:", c.LocalAddr(), c.RemoteAddr())
-	target.HandleConn(c)
+
+	tryHandle(target, c)
+
 	_ = c.Close()
+}
+
+func tryHandle(target *tcpproxy.DialProxy, c net.Conn) {
+	log.Println("handle for:", c.LocalAddr(), c.RemoteAddr())
+	err := target.HandleConn(c)
+
+	if err != nil {
+		tryHandle(target, c)
+	}
 }
 
 func getProxyUrl(ips chan string, db *gorm.DB) {
