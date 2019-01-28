@@ -50,8 +50,6 @@ func main() {
 
 func serveConn(c net.Conn, ips chan string) {
 	br := bufio.NewReader(c)
-	target := tcpproxy.To(<-ips)
-	target.DialTimeout = time.Second * 5
 
 	if n := br.Buffered(); n > 0 {
 		peeked, _ := br.Peek(br.Buffered())
@@ -61,18 +59,21 @@ func serveConn(c net.Conn, ips chan string) {
 		}
 	}
 
-	tryHandle(target, c)
+	tryHandle(c, ips)
 
 	_ = c.Close()
 }
 
-func tryHandle(target *tcpproxy.DialProxy, c net.Conn) {
+func tryHandle(c net.Conn, ips chan string) {
+	target := tcpproxy.To(<-ips)
+	target.DialTimeout = time.Second * 5
+
 	log.Println("handle for:", c.RemoteAddr())
 	err := target.HandleConn(c)
 
 	if err != nil {
 		log.Println("try request for:", c.RemoteAddr())
-		tryHandle(target, c)
+		tryHandle(c, ips)
 	}
 }
 
