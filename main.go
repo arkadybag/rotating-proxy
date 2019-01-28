@@ -8,10 +8,13 @@ import (
 	"net"
 	"os"
 	"proxy-miner/models"
+	"runtime"
 	"time"
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	port := os.Getenv("PORT")
 
 	if port == "" {
