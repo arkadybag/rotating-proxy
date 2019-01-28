@@ -65,14 +65,15 @@ func serveConn(c net.Conn, ips chan string) {
 }
 
 func tryHandle(c net.Conn, ips chan string) {
-	target := tcpproxy.To(<-ips)
+	ip := <-ips
+	target := tcpproxy.To(ip)
 	target.DialTimeout = time.Second * 5
 
 	log.Println("handle for:", c.RemoteAddr())
 	err := target.HandleConn(c)
 
 	if err != nil {
-		log.Println("error for:", target.Addr, "try next...")
+		log.Println("error for:", ip, "try next...")
 		tryHandle(c, ips)
 	}
 }
