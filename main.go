@@ -2,16 +2,19 @@ package main
 
 import (
 	"bufio"
-	"github.com/google/tcpproxy"
+	"github.com/arkadybag/tcpproxy"
 	"github.com/jinzhu/gorm"
 	"log"
 	"net"
 	"os"
 	"proxy-miner/models"
+	"runtime"
 	"time"
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	port := os.Getenv("PORT")
 
 	if port == "" {
@@ -47,7 +50,6 @@ func main() {
 
 func serveConn(c net.Conn, ips chan string) {
 	br := bufio.NewReader(c)
-	target := tcpproxy.To(<-ips)
 
 	if n := br.Buffered(); n > 0 {
 		peeked, _ := br.Peek(br.Buffered())
@@ -56,9 +58,24 @@ func serveConn(c net.Conn, ips chan string) {
 			Conn:   c,
 		}
 	}
-	log.Println("handle for:", c.LocalAddr(), c.RemoteAddr())
-	target.HandleConn(c)
+
+	tryHandle(c, ips)
+
 	_ = c.Close()
+}
+
+func tryHandle(c net.Conn, ips chan string) {
+	ip := <-ips
+	target := tcpproxy.To(ip)
+	target.DialTimeout = time.Second * 5
+
+	log.Println("handle for:", c.RemoteAddr())
+	err := target.HandleConn(c)
+
+	if err != nil {
+		log.Println("error for:", ip, "try next...")
+		tryHandle(c, ips)
+	}
 }
 
 func getProxyUrl(ips chan string, db *gorm.DB) {
@@ -67,8 +84,8 @@ func getProxyUrl(ips chan string, db *gorm.DB) {
 
 		db.Table("proxies").
 			Select("content").
-			Where("update_time <= ?", time.Now().Unix()-int64(240)).
-			Order("score desc").
+			Where("update_time >= ? AND avg_response_time <= ?", time.Now().Unix()-int64(240), 4).
+			Order(gorm.Expr("random()")).
 			Limit(100).
 			Find(&proxies)
 
