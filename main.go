@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/tls"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
@@ -31,8 +32,8 @@ func main() {
 		log.Fatalln("can not connect to postgres:", err)
 	}
 
-	ips := make(chan string, 200)
-	sem := make(chan bool, 120)
+	ips := make(chan string, 100)
+	sem := make(chan bool, 200)
 	go cleaner(ips)
 
 	go getProxyUrl(ips, db)
@@ -117,27 +118,36 @@ func dialCoordinatorViaCONNECT(addr string, ips chan string, counter *uint64) (n
 	err = c.SetReadDeadline(time.Now().Add(time.Second * 15))
 
 	if err != nil {
+		c.Close()
 		log.Printf("Try again for %s ...", addr)
 		return dialCoordinatorViaCONNECT(addr, ips, counter)
 	}
 
 	_, err = fmt.Fprintf(c, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, addr)
 	if err != nil {
+		c.Close()
+
 		log.Printf("Try again for %s ...", addr)
 		return dialCoordinatorViaCONNECT(addr, ips, counter)
 	}
 	br := bufio.NewReader(c)
 	res, err := http.ReadResponse(br, nil)
 	if err != nil {
+		c.Close()
+
 		log.Printf("Try again for %s ...", addr)
 		return dialCoordinatorViaCONNECT(addr, ips, counter)
 	}
 	if res.StatusCode != 200 {
+		c.Close()
+
 		log.Printf("Try again for %s ...", addr)
 		return dialCoordinatorViaCONNECT(addr, ips, counter)
 	}
 
 	if br.Buffered() > 0 {
+		c.Close()
+
 		log.Printf("unexpected %d bytes of buffered data from CONNECT proxy %q",
 			br.Buffered(), proxyAddr)
 		log.Printf("Try again for %s ...", addr)
@@ -182,8 +192,7 @@ func getProxyUrl(ips chan string, db *gorm.DB) {
 
 		db.Table("proxies").
 			Select("content").
-			Where("assess_times = success_times").
-			Order("assess_times desc, score desc").
+			Order("score desc").
 			Limit(100).
 			Find(&proxies)
 
