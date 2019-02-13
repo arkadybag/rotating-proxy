@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"crypto/tls"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
@@ -32,7 +31,8 @@ func main() {
 		log.Fatalln("can not connect to postgres:", err)
 	}
 
-	ips := make(chan string, 100)
+	ips := make(chan string, 200)
+	sem := make(chan bool, 120)
 	go cleaner(ips)
 
 	go getProxyUrl(ips, db)
@@ -40,10 +40,11 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			sem <- true
 			if r.Method == http.MethodConnect {
-				handleTunneling(w, r, ips)
+				handleTunneling(w, r, ips, sem)
 			} else {
-				handleHTTP(w, r, ips)
+				handleHTTP(w, r, ips, sem)
 			}
 		}),
 		// Disable HTTP/2.
@@ -65,7 +66,10 @@ func cleaner(ips chan string) {
 	}
 }
 
-func handleTunneling(w http.ResponseWriter, r *http.Request, ips chan string) {
+func handleTunneling(w http.ResponseWriter, r *http.Request, ips chan string, sem chan bool) {
+	defer func() {
+		<-sem
+	}()
 	var counter uint64
 
 	dest_conn, err := dialCoordinatorViaCONNECT(r.Host, ips, &counter)
@@ -82,6 +86,7 @@ func handleTunneling(w http.ResponseWriter, r *http.Request, ips chan string) {
 	client_conn, _, err := hijacker.Hijack()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
 	}
 	go transfer(dest_conn, client_conn)
 	go transfer(client_conn, dest_conn)
@@ -104,13 +109,19 @@ func dialCoordinatorViaCONNECT(addr string, ips chan string, counter *uint64) (n
 	proxyAddr := <-ips
 
 	log.Printf("dialing proxy %q to remote: %s", proxyAddr, addr)
-	c, err := net.DialTimeout("tcp", proxyAddr, time.Second*5)
+	c, err := net.DialTimeout("tcp", proxyAddr, time.Second*10)
+	if err != nil {
+		log.Printf("Try again for %s ...", addr)
+		return dialCoordinatorViaCONNECT(addr, ips, counter)
+	}
+	err = c.SetReadDeadline(time.Now().Add(time.Second * 15))
 
 	if err != nil {
 		log.Printf("Try again for %s ...", addr)
 		return dialCoordinatorViaCONNECT(addr, ips, counter)
 	}
-	_, err = fmt.Fprintf(c, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, proxyAddr)
+
+	_, err = fmt.Fprintf(c, "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", addr, addr)
 	if err != nil {
 		log.Printf("Try again for %s ...", addr)
 		return dialCoordinatorViaCONNECT(addr, ips, counter)
@@ -135,7 +146,10 @@ func dialCoordinatorViaCONNECT(addr string, ips chan string, counter *uint64) (n
 	return c, nil
 }
 
-func handleHTTP(w http.ResponseWriter, req *http.Request, ips chan string) {
+func handleHTTP(w http.ResponseWriter, req *http.Request, ips chan string, sem chan bool) {
+	defer func() {
+		<-sem
+	}()
 	execHandleHTTP(w, req, ips)
 }
 
@@ -168,9 +182,8 @@ func getProxyUrl(ips chan string, db *gorm.DB) {
 
 		db.Table("proxies").
 			Select("content").
-			Where("update_time >= ? AND score >= ?", time.Now().Unix()-int64(240), 10).
-			Order("score").
-			//Order(gorm.Expr("random()")).
+			Where("assess_times = success_times").
+			Order("assess_times desc, score desc").
 			Limit(100).
 			Find(&proxies)
 
