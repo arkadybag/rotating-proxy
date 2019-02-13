@@ -61,6 +61,7 @@ func cleaner(ips chan string) {
 
 	for range ticker.C {
 		<-ips
+		log.Println("cleaner TICK")
 	}
 }
 
