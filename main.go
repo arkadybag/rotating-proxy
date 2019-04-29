@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"crypto/subtle"
 	"crypto/tls"
 	"fmt"
 	"github.com/jinzhu/gorm"
@@ -41,6 +42,16 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, pass, ok := r.BasicAuth()
+
+			if !ok || subtle.ConstantTimeCompare([]byte(user), []byte("arkady")) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte("arkady13like!#")) != 1 {
+				w.Header().Set("WWW-Authenticate", `Basic realm="`+"LOL"+`"`)
+				w.WriteHeader(401)
+				w.Write([]byte("Unauthorised.\n"))
+				log.Println("UNAUTHORIZED FOR:", r.RemoteAddr)
+				return
+			}
+
 			sem <- true
 			if r.Method == http.MethodConnect {
 				handleTunneling(w, r, ips, sem)
