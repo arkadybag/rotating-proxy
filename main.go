@@ -2,8 +2,8 @@ package main
 
 import (
 	"bufio"
-	"crypto/subtle"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/pkg/errors"
@@ -15,6 +15,7 @@ import (
 	"os"
 	"proxy-miner/models"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -42,15 +43,23 @@ func main() {
 	server := &http.Server{
 		Addr: ":" + port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user, pass, ok := r.BasicAuth()
 
-			if !ok || subtle.ConstantTimeCompare([]byte(user), []byte("arkady")) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte("arkady13like")) != 1 {
-				w.Header().Set("WWW-Authenticate", `Basic realm="`+"LOL"+`"`)
-				w.WriteHeader(401)
-				w.Write([]byte("Unauthorised.\n"))
-				log.Println("UNAUTHORIZED FOR:", r.RemoteAddr)
+			auth := strings.SplitN(r.Header.Get("Proxy-Authorization"), " ", 2)
+
+			if len(auth) != 2 || auth[0] != "Basic" {
+				http.Error(w, "authorization failed", http.StatusUnauthorized)
 				return
 			}
+
+			payload, _ := base64.StdEncoding.DecodeString(auth[1])
+			pair := strings.SplitN(string(payload), ":", 2)
+
+			if len(pair) != 2 || pair[0] != "arkady" && pair[1] != "arkady13like" {
+				http.Error(w, "authorization failed", http.StatusUnauthorized)
+				return
+			}
+
+			r.Header.Del("Proxy-Authorization")
 
 			sem <- true
 			if r.Method == http.MethodConnect {
