@@ -44,7 +44,7 @@ func main() {
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user, pass, ok := r.BasicAuth()
 
-			if !ok || subtle.ConstantTimeCompare([]byte(user), []byte("arkady")) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte("arkady13like!#")) != 1 {
+			if !ok || subtle.ConstantTimeCompare([]byte(user), []byte("arkady")) != 1 || subtle.ConstantTimeCompare([]byte(pass), []byte("arkady13like")) != 1 {
 				w.Header().Set("WWW-Authenticate", `Basic realm="`+"LOL"+`"`)
 				w.WriteHeader(401)
 				w.Write([]byte("Unauthorised.\n"))
