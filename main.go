@@ -34,7 +34,7 @@ func main() {
 		log.Fatalln("can not connect to postgres:", err)
 	}
 
-	ips := make(chan string, 100)
+	ips := make(chan string, 200)
 	sem := make(chan bool, 200)
 	go cleaner(ips)
 
@@ -116,7 +116,7 @@ func handleTunneling(w http.ResponseWriter, r *http.Request, ips chan string, se
 func transfer(destination io.WriteCloser, source io.ReadCloser) {
 	defer destination.Close()
 	defer source.Close()
-	io.Copy(destination, source)
+	_, _ = io.Copy(destination, source)
 }
 
 func dialCoordinatorViaCONNECT(addr string, ips chan string, counter *uint64) (net.Conn, error) {
@@ -213,7 +213,7 @@ func getProxyUrl(ips chan string, db *gorm.DB) {
 		db.Table("proxies").
 			Select("content").
 			Order("score desc").
-			Limit(100).
+			Limit(200).
 			Find(&proxies)
 
 		for _, proxy := range proxies {
